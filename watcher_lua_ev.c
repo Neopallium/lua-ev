@@ -134,7 +134,7 @@ static void watcher_cb(struct ev_loop *loop, void *watcher, int revents) {
     void*      objs[3] = { loop, watcher, NULL };
     int        result;
 
-    lua_pushcfunction(L, traceback);
+    push_traceback(L);
 
     result = lua_checkstack(L, 5);
     assert(result != 0 /* able to allocate enough space on lua stack */);

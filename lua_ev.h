@@ -91,7 +91,7 @@
  * Generic functions:
  */
 static int               version(lua_State *L);
-static int               traceback(lua_State *L);
+static void              push_traceback(lua_State *L);
 
 /**
  * Loop functions:

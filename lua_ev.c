@@ -23,6 +23,29 @@ static const luaL_reg R[] = {
     {NULL, NULL},
 };
 
+static char *traceback_key = "LUA_EV_TRACEBACK_KEY";
+
+static void push_traceback(lua_State *L) {
+    lua_pushlightuserdata(L, traceback_key);
+    lua_gettable(L, LUA_REGISTRYINDEX); /* registry[<traceback_key>] */
+}
+
+static void save_traceback(lua_State *L) {
+    lua_pushlightuserdata(L, traceback_key);
+    /* save reference to 'debug.traceback' */
+    lua_getfield(L, LUA_GLOBALSINDEX, "debug");
+    if ( !lua_istable(L, -1) ) {
+        luaL_error(L, "Can't get global 'debug'");
+    }
+
+    lua_getfield(L, -1, "traceback");
+    if ( !lua_isfunction(L, -1) ) {
+        luaL_error(L, "Can't get 'debug.trackeback' function");
+    }
+    lua_remove(L, -2); /* remove 'debug' table from stack. */
+    lua_settable(L, LUA_REGISTRYINDEX); /* registry[<traceback_key>] = debug.traceback */
+}
+
 /**
  * Entry point into the 'ev' lua library.  Validates that the
  * dynamically linked libev version matches, creates the object
@@ -34,6 +57,8 @@ LUALIB_API int luaopen_ev(lua_State *L) {
            ev_version_minor() >= EV_VERSION_MINOR);
 
     create_obj_registry(L);
+
+    save_traceback(L);
 
     luaL_register(L, "ev", R);
 
