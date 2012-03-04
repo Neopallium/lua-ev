@@ -29,7 +29,7 @@ static int create_timer_mt(lua_State *L) {
         { "clear_pending", timer_clear_pending },
         { NULL, NULL }
     };
-    luaL_newmetatable(L, TIMER_MT);
+    lua_ev_newmetatable(L, TIMER_MT);
     add_watcher_mt(L);
     luaL_register(L, NULL, fns);
 

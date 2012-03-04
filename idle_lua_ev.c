@@ -27,7 +27,7 @@ static int create_idle_mt(lua_State *L) {
         { "start",         idle_start },
         { NULL, NULL }
     };
-    luaL_newmetatable(L, IDLE_MT);
+    lua_ev_newmetatable(L, IDLE_MT);
     add_watcher_mt(L);
     luaL_register(L, NULL, fns);
 

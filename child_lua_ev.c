@@ -35,7 +35,7 @@ static int create_child_mt(lua_State *L) {
         { "getstatus" ,    child_getstatus },
         { NULL, NULL }
     };
-    luaL_newmetatable(L, CHILD_MT);
+    lua_ev_newmetatable(L, CHILD_MT);
     add_watcher_mt(L);
     luaL_register(L, NULL, fns);
 

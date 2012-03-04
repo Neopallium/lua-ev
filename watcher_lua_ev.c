@@ -1,7 +1,6 @@
 #include <stdint.h>
 
-static const char* watcher_magic = "a string that is used"
-    " to mark a watcher";
+static char watcher_magic[] = "ev{watcher}";
 
 /**
  * Add watcher specific methods to the table on the top of the lua
@@ -24,8 +23,8 @@ static int add_watcher_mt(lua_State *L) {
     luaL_register(L, NULL, fns);
 
     /* Mark this as being a watcher: */
-    lua_pushliteral(L, "is_watcher__");
     lua_pushlightuserdata(L, (void*)watcher_magic);
+    lua_pushboolean(L, 1);
     lua_rawset(L, -3);
 
     return 0;
@@ -33,9 +32,8 @@ static int add_watcher_mt(lua_State *L) {
 
 /**
  * Checks that we have a watcher at watcher_i index by validating the
- * metatable has the is_watcher__ field set to the watcher magic light
- * userdata that is simply used to mark a metatable as being a
- * "watcher".
+ * metatable has the <watcher_magic> field set to true that is simply
+ * used to mark a metatable as being a "watcher".
  *
  * [-0, +0, ?]
  */
@@ -43,11 +41,11 @@ static struct ev_watcher* check_watcher(lua_State *L, int watcher_i) {
     void *watcher = lua_touserdata(L, watcher_i);
     if ( watcher != NULL ) { /* Got a userdata? */
         if ( lua_getmetatable(L, watcher_i) ) { /* got a metatable? */
-            lua_getfield(L, -1, "is_watcher__");
             lua_pushlightuserdata(L, (void*)watcher_magic);
+            lua_rawget(L, -2);
 
-            if ( lua_rawequal(L, -1, -2) ) {
-                lua_pop(L, 3);
+            if ( lua_toboolean(L, -1) ) {
+                lua_pop(L, 2);
                 return (struct ev_watcher*)watcher;
             }
         }

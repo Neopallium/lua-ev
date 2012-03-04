@@ -28,7 +28,7 @@ static int create_stat_mt(lua_State *L) {
         { "getdata",       stat_getdata },
         { NULL, NULL }
     };
-    luaL_newmetatable(L, STAT_MT);
+    lua_ev_newmetatable(L, STAT_MT);
     add_watcher_mt(L);
     luaL_register(L, NULL, fns);
 

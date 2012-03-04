@@ -17,13 +17,13 @@
 /**
  * Define the names used for the metatables.
  */
-#define LOOP_MT    "ev{loop}"
-#define IO_MT      "ev{io}"
-#define TIMER_MT   "ev{timer}"
-#define SIGNAL_MT  "ev{signal}"
-#define IDLE_MT    "ev{idle}"
-#define CHILD_MT   "ev{child}"
-#define STAT_MT    "ev{stat}"
+#define LOOP_MT    lua_ev_loop_mt
+#define IO_MT      lua_ev_io_mt
+#define TIMER_MT   lua_ev_timer_mt
+#define SIGNAL_MT  lua_ev_signal_mt
+#define IDLE_MT    lua_ev_idle_mt
+#define CHILD_MT   lua_ev_child_mt
+#define STAT_MT    lua_ev_stat_mt
 
 /**
  * Special token to represent the uninitialized default loop.  This is
@@ -44,7 +44,7 @@
 #define WATCHER_SHADOW 2
 
 /**
- * Various "check" functions simply call luaL_checkudata() and do the
+ * Various "check" functions simply call lua_ev_checkobject() and do the
  * appropriate casting, with the exception of check_watcher which is
  * implemented as a C function.
  */
@@ -55,26 +55,29 @@
  * loop userdata is a pointer, so don't forget to de-reference the
  * result.
  */
+static void lua_ev_newmetatable(lua_State *L, const char *type_mt);
+static void lua_ev_getmetatable(lua_State *L, const char *type_mt);
+static void *lua_ev_checkobject(lua_State *L, int idx, const char *type_mt);
 #define check_loop(L, narg)                                      \
-    ((struct ev_loop**)    luaL_checkudata((L), (narg), LOOP_MT))
+    ((struct ev_loop**)    lua_ev_checkobject((L), (narg), LOOP_MT))
 
 #define check_timer(L, narg)                                     \
-    ((struct ev_timer*)    luaL_checkudata((L), (narg), TIMER_MT))
+    ((struct ev_timer*)    lua_ev_checkobject((L), (narg), TIMER_MT))
 
 #define check_io(L, narg)                                        \
-    ((struct ev_io*)       luaL_checkudata((L), (narg), IO_MT))
+    ((struct ev_io*)       lua_ev_checkobject((L), (narg), IO_MT))
 
 #define check_signal(L, narg)                                   \
-    ((struct ev_signal*)   luaL_checkudata((L), (narg), SIGNAL_MT))
+    ((struct ev_signal*)   lua_ev_checkobject((L), (narg), SIGNAL_MT))
 
 #define check_idle(L, narg)                                      \
-    ((struct ev_idle*)     luaL_checkudata((L), (narg), IDLE_MT))
+    ((struct ev_idle*)     lua_ev_checkobject((L), (narg), IDLE_MT))
 
 #define check_child(L, narg)                                      \
-    ((struct ev_child*)     luaL_checkudata((L), (narg), CHILD_MT))
+    ((struct ev_child*)     lua_ev_checkobject((L), (narg), CHILD_MT))
 
 #define check_stat(L, narg)                                      \
-    ((struct ev_stat*)     luaL_checkudata((L), (narg), STAT_MT))
+    ((struct ev_stat*)     lua_ev_checkobject((L), (narg), STAT_MT))
 
 
 /**

@@ -27,7 +27,7 @@ static int create_signal_mt(lua_State *L) {
         { "start",         signal_start },
         { NULL, NULL }
     };
-    luaL_newmetatable(L, SIGNAL_MT);
+    lua_ev_newmetatable(L, SIGNAL_MT);
     add_watcher_mt(L);
     luaL_register(L, NULL, fns);
 

@@ -39,7 +39,7 @@ static int create_loop_mt(lua_State *L) {
         { "__gc",       loop_delete },
         { NULL, NULL }
     };
-    luaL_newmetatable(L, LOOP_MT);
+    lua_ev_newmetatable(L, LOOP_MT);
     luaL_register(L, NULL, fns);
     lua_pushvalue(L, -1);
     lua_setfield(L, -2, "__index");

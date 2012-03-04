@@ -28,7 +28,7 @@ static int create_io_mt(lua_State *L) {
         { "getfd" ,        io_getfd },
         { NULL, NULL }
     };
-    luaL_newmetatable(L, IO_MT);
+    lua_ev_newmetatable(L, IO_MT);
     add_watcher_mt(L);
     luaL_register(L, NULL, fns);
 

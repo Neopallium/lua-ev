@@ -5,6 +5,14 @@
 
 #include "lua_ev.h"
 
+static char lua_ev_loop_mt[]   = "ev{loop}";
+static char lua_ev_io_mt[]     = "ev{io}";
+static char lua_ev_timer_mt[]  = "ev{timer}";
+static char lua_ev_signal_mt[] = "ev{signal}";
+static char lua_ev_idle_mt[]   = "ev{idle}";
+static char lua_ev_child_mt[]  = "ev{child}";
+static char lua_ev_stat_mt[]   = "ev{stat}";
+
 /* We make everything static, so we just include all *.c files in a
  * single compilation unit. */
 #include "obj_lua_ev.c"
