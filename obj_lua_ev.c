@@ -166,3 +166,5 @@ static int push_objs(lua_State* L, void** objs) {
 
     return obj_count;
 }
+
+/* vi:set expandtab ts=4: */

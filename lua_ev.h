@@ -205,3 +205,5 @@ static int               stat_stop(lua_State *L);
 static int               stat_start(lua_State *L);
 static int               stat_start(lua_State *L);
 static int               stat_getdata(lua_State *L);
+
+/* vi:set expandtab ts=4: */

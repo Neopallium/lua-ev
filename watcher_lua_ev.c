@@ -223,3 +223,5 @@ static int watcher_priority(lua_State *L) {
     lua_pushinteger(L, old_pri);
     return 1;
 }
+
+/* vi:set expandtab ts=4: */

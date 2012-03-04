@@ -178,3 +178,5 @@ static int stat_getdata(lua_State *L) {
 
     return 1;
 }
+
+/* vi:set expandtab ts=4: */

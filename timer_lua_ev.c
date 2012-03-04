@@ -167,3 +167,5 @@ static int timer_clear_pending(lua_State *L) {
     lua_pushnumber(L, revents);
     return 1;
 }
+
+/* vi:set expandtab ts=4: */

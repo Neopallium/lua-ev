@@ -123,3 +123,5 @@ static int traceback(lua_State *L) {
     lua_call(L, 2, 1);      /* call debug.traceback */
     return 1;
 }
+
+/* vi:set expandtab ts=4: */

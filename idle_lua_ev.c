@@ -95,3 +95,5 @@ static int idle_start(lua_State *L) {
 
     return 0;
 }
+
+/* vi:set expandtab ts=4: */
