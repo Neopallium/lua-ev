@@ -22,17 +22,13 @@ static int luaopen_ev_io(lua_State *L) {
  */
 static int create_io_mt(lua_State *L) {
 
-    static luaL_reg fns[] = {
+    static luaL_reg methods[] = {
         { "stop",          io_stop },
         { "start",         io_start },
         { "getfd" ,        io_getfd },
         { NULL, NULL }
     };
-    lua_ev_newmetatable(L, IO_MT);
-    add_watcher_mt(L);
-    luaL_register(L, NULL, fns);
-
-    return 1;
+    return add_watcher_mt(L, methods, IO_MT);
 }
 
 /**

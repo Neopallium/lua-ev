@@ -22,18 +22,14 @@ static int luaopen_ev_timer(lua_State *L) {
  */
 static int create_timer_mt(lua_State *L) {
 
-    static luaL_reg fns[] = {
+    static luaL_reg methods[] = {
         { "again",         timer_again },
         { "stop",          timer_stop },
         { "start",         timer_start },
         { "clear_pending", timer_clear_pending },
         { NULL, NULL }
     };
-    lua_ev_newmetatable(L, TIMER_MT);
-    add_watcher_mt(L);
-    luaL_register(L, NULL, fns);
-
-    return 1;
+    return add_watcher_mt(L, methods, TIMER_MT);
 }
 
 /**

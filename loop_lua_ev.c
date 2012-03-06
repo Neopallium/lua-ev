@@ -25,7 +25,7 @@ static int luaopen_ev_loop(lua_State *L) {
  */
 static int create_loop_mt(lua_State *L) {
 
-    static luaL_reg fns[] = {
+    static luaL_reg methods[] = {
         { "is_default", loop_is_default },
         { "count",      loop_iteration }, /* old API */
         { "iteration",  loop_iteration },
@@ -36,14 +36,23 @@ static int create_loop_mt(lua_State *L) {
         { "unloop",     loop_unloop },
         { "backend",    loop_backend },
         { "fork",       loop_fork },
-        { "__gc",       loop_delete },
         { NULL, NULL }
     };
     lua_ev_newmetatable(L, LOOP_MT);
-    luaL_register(L, NULL, fns);
-    lua_pushvalue(L, -1);
+
+    /* create methods table. */
+    lua_createtable(L, 0, 10);
+    luaL_register(L, NULL, methods);
+
     lua_setfield(L, -2, "__index");
 
+    /* add __gc metamethod. */
+    lua_pushcfunction(L, loop_delete);
+    lua_setfield(L, -2, "__gc");
+
+    /* hide metatable. */
+    lua_pushboolean(L, 0);
+    lua_setfield(L, -2, "__metatable");
     return 1;
 }
 

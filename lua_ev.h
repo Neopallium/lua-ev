@@ -142,7 +142,7 @@ static void*             obj_new(lua_State* L, size_t size, const char* tname);
 /**
  * Watcher functions:
  */
-static int               add_watcher_mt(lua_State *L);
+static int               add_watcher_mt(lua_State *L, luaL_reg* methods, const char* tname);
 static int               watcher_is_active(lua_State *L);
 static int               watcher_is_pending(lua_State *L);
 static int               watcher_clear_pending(lua_State *L);

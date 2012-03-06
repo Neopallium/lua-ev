@@ -22,16 +22,12 @@ static int luaopen_ev_idle(lua_State *L) {
  */
 static int create_idle_mt(lua_State *L) {
 
-    static luaL_reg fns[] = {
+    static luaL_reg methods[] = {
         { "stop",          idle_stop },
         { "start",         idle_start },
         { NULL, NULL }
     };
-    lua_ev_newmetatable(L, IDLE_MT);
-    add_watcher_mt(L);
-    luaL_register(L, NULL, fns);
-
-    return 1;
+    return add_watcher_mt(L, methods, IDLE_MT);
 }
 
 /**

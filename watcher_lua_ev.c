@@ -8,26 +8,39 @@ static char watcher_magic[] = "ev{watcher}";
  *
  * [-0, +0, ?]
  */
-static int add_watcher_mt(lua_State *L) {
+static int add_watcher_mt(lua_State *L, luaL_reg* methods, const char* tname) {
 
-    static luaL_reg fns[] = {
+    static luaL_reg common_methods[] = {
         { "is_active",     watcher_is_active },
         { "is_pending",    watcher_is_pending },
         { "clear_pending", watcher_clear_pending },
         { "callback",      watcher_callback },
         { "priority",      watcher_priority },
-        { "__index",       watcher_index },
-        { "__newindex",    watcher_newindex },
         { NULL, NULL }
     };
-    luaL_register(L, NULL, fns);
+    lua_ev_newmetatable(L, tname);
 
     /* Mark this as being a watcher: */
     lua_pushlightuserdata(L, (void*)watcher_magic);
     lua_pushboolean(L, 1);
     lua_rawset(L, -3);
 
-    return 0;
+    /* create methods table. */
+    lua_createtable(L, 0, 10);
+        /* add methods to table. */
+    luaL_register(L, NULL, common_methods);
+    luaL_register(L, NULL, methods);
+
+    /* create __index/__newindex closures in metatable. */
+    lua_pushcclosure(L, watcher_index, 1); /* use methods table in upval 1. */
+    lua_setfield(L, -2, "__index");
+    lua_pushcfunction(L, watcher_newindex);
+    lua_setfield(L, -2, "__newindex");
+
+    /* hide metatable. */
+    lua_pushboolean(L, 0);
+    lua_setfield(L, -2, "__metatable");
+    return 1;
 }
 
 static ev_watcher* lua_ev_checkwatcher(lua_State *L, int idx, const char *type_mt) {
@@ -279,15 +292,13 @@ static int watcher_index(lua_State *L) {
 
     /* STACK: <watcher>, <key> */
 
-    /* first lookup method in metatable. */
-    if ( lua_getmetatable(L, 1) ) {
-        lua_pushvalue(L, 2);
-        /* STACK: <watcher>, <key>, <metatable>, <key> */
-        lua_gettable(L, -2);
-        /* STACK: <watcher>, <key>, <metatable>, <value> */
-        if ( ! lua_isnil(L, -1) ) return 1;
-        lua_pop(L, 2); /* pop <metatable>, <nil> */
-    }
+    /* first lookup method in methods table (upval 1). */
+    lua_pushvalue(L, 2); /* dup <key> */
+    /* STACK: <watcher>, <key>, <key> */
+    lua_gettable(L, lua_upvalueindex(1));
+    /* STACK: <watcher>, <key>, <value> */
+    if ( ! lua_isnil(L, -1) ) return 1;
+    lua_pop(L, 1); /* pop <nil> */
     /* STACK: <watcher>, <key> */
 
     watcher = check_watcher(L, 1);
