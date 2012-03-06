@@ -50,7 +50,7 @@ static int stat_new(lua_State* L) {
     ev_tstamp   interval = luaL_optint(L, 3, 0);
     ev_stat*    stat;
 
-    stat = watcher_new(L, sizeof(ev_stat), STAT_MT);
+    stat = (ev_stat*)watcher_new(L, sizeof(ev_stat), STAT_MT);
     ev_stat_init(stat, &stat_cb, path, interval);
     return 1;
 }
@@ -76,7 +76,7 @@ static int stat_stop(lua_State *L) {
     ev_stat*        stat  = check_stat(L, 1);
     struct ev_loop* loop = *check_loop_and_init(L, 2);
 
-    loop_stop_watcher(L, 2, 1);
+    loop_stop_watcher(L, loop, GET_WATCHER_DATA(stat), 1);
     ev_stat_stop(loop, stat);
 
     return 0;
@@ -96,7 +96,7 @@ static int stat_start(lua_State *L) {
     int is_daemon        = lua_toboolean(L, 3);
 
     ev_stat_start(loop, stat);
-    loop_start_watcher(L, 2, 1, is_daemon);
+    loop_start_watcher(L, loop, GET_WATCHER_DATA(stat), 2, 1, is_daemon);
 
     return 0;
 }

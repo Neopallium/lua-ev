@@ -47,7 +47,7 @@ static int signal_new(lua_State* L) {
     int         signum = luaL_checkint(L, 2);
     ev_signal*  sig;
 
-    sig = watcher_new(L, sizeof(ev_signal), SIGNAL_MT);
+    sig = (ev_signal*)watcher_new(L, sizeof(ev_signal), SIGNAL_MT);
     ev_signal_init(sig, &signal_cb, signum);
     return 1;
 }
@@ -73,7 +73,7 @@ static int signal_stop(lua_State *L) {
     ev_signal*      sig  = check_signal(L, 1);
     struct ev_loop* loop = *check_loop_and_init(L, 2);
 
-    loop_stop_watcher(L, 2, 1);
+    loop_stop_watcher(L, loop, GET_WATCHER_DATA(sig), 1);
     ev_signal_stop(loop, sig);
 
     return 0;
@@ -93,7 +93,7 @@ static int signal_start(lua_State *L) {
     int is_daemon        = lua_toboolean(L, 3);
 
     ev_signal_start(loop, sig);
-    loop_start_watcher(L, 2, 1, is_daemon);
+    loop_start_watcher(L, loop, GET_WATCHER_DATA(sig), 2, 1, is_daemon);
 
     return 0;
 }

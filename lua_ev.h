@@ -32,6 +32,18 @@
  */
 #define UNINITIALIZED_DEFAULT_LOOP (struct ev_loop*)1
 
+typedef struct lua_ev_watcher_data lua_ev_watcher_data;
+
+struct lua_ev_watcher_data {
+    int watcher_ref;
+    int flags;
+};
+#define ALIGN_SIZE(s, n) (((s) + ((n) - 1)) & -(n))
+#define WATCHER_DATA_SIZE ALIGN_SIZE(sizeof(lua_ev_watcher_data), sizeof(void *))
+#define GET_WATCHER_DATA(watcher) (lua_ev_watcher_data*)(((char*)watcher) - WATCHER_DATA_SIZE)
+#define WATCHER_FLAG_IS_DAEMON   1
+#define WATCHER_FLAG_HAS_SHADOW  2
+
 /**
  * The location in the fenv of the watcher that contains the callback
  * function.
@@ -39,9 +51,14 @@
 #define WATCHER_FN 1
 
 /**
+ * The location in the fenv of the watcher that contains the ev_loop reference.
+ */
+#define WATCHER_LOOP 2
+
+/**
  * The location in the fenv of the shadow table.
  */
-#define WATCHER_SHADOW 2
+#define WATCHER_SHADOW 3
 
 /**
  * Various "check" functions simply call lua_ev_checkobject() and do the
@@ -57,27 +74,28 @@
  */
 static void lua_ev_newmetatable(lua_State *L, const char *type_mt);
 static void lua_ev_getmetatable(lua_State *L, const char *type_mt);
-static void *lua_ev_checkobject(lua_State *L, int idx, const char *type_mt);
+static void* lua_ev_checkobject(lua_State *L, int idx, const char *type_mt);
+static ev_watcher* lua_ev_checkwatcher(lua_State *L, int idx, const char *type_mt);
 #define check_loop(L, narg)                                      \
     ((struct ev_loop**)    lua_ev_checkobject((L), (narg), LOOP_MT))
 
 #define check_timer(L, narg)                                     \
-    ((struct ev_timer*)    lua_ev_checkobject((L), (narg), TIMER_MT))
+    ((ev_timer*)    lua_ev_checkwatcher((L), (narg), TIMER_MT))
 
 #define check_io(L, narg)                                        \
-    ((struct ev_io*)       lua_ev_checkobject((L), (narg), IO_MT))
+    ((ev_io*)       lua_ev_checkwatcher((L), (narg), IO_MT))
 
 #define check_signal(L, narg)                                   \
-    ((struct ev_signal*)   lua_ev_checkobject((L), (narg), SIGNAL_MT))
+    ((ev_signal*)   lua_ev_checkwatcher((L), (narg), SIGNAL_MT))
 
 #define check_idle(L, narg)                                      \
-    ((struct ev_idle*)     lua_ev_checkobject((L), (narg), IDLE_MT))
+    ((ev_idle*)     lua_ev_checkwatcher((L), (narg), IDLE_MT))
 
 #define check_child(L, narg)                                      \
-    ((struct ev_child*)     lua_ev_checkobject((L), (narg), CHILD_MT))
+    ((ev_child*)     lua_ev_checkwatcher((L), (narg), CHILD_MT))
 
 #define check_stat(L, narg)                                      \
-    ((struct ev_stat*)     lua_ev_checkobject((L), (narg), STAT_MT))
+    ((ev_stat*)     lua_ev_checkwatcher((L), (narg), STAT_MT))
 
 
 /**
@@ -85,9 +103,6 @@ static void *lua_ev_checkobject(lua_State *L, int idx, const char *type_mt);
  * negative stack index into a positive one so that if the stack later
  * grows or shrinks, the index will not be effected.
  */
-#define abs_index(L, i)                    \
-    ((i) > 0 || (i) <= LUA_REGISTRYINDEX ? \
-     (i) : lua_gettop(L) + (i) + 1)
 
 
 /**
@@ -105,8 +120,10 @@ static struct ev_loop**  loop_alloc(lua_State *L);
 static struct ev_loop**  check_loop_and_init(lua_State *L, int loop_i);
 static int               loop_new(lua_State *L);
 static int               loop_delete(lua_State *L);
-static void              loop_start_watcher(lua_State* L, int loop_i, int watcher_i, int is_daemon);
-static void              loop_stop_watcher(lua_State* L, int loop_i, int watcher_i);
+static void              loop_start_watcher(lua_State* L, struct ev_loop *loop,
+                            lua_ev_watcher_data* wdata, int loop_i, int watcher_i, int is_daemon);
+static void              loop_stop_watcher(lua_State* L, struct ev_loop *loop,
+                            lua_ev_watcher_data* wdata, int watcher_i);
 static int               loop_is_default(lua_State *L);
 static int               loop_iteration(lua_State *L);
 static int               loop_depth(lua_State *L);
@@ -120,26 +137,22 @@ static int               loop_fork(lua_State *L);
 /**
  * Object functions:
  */
-static void              create_obj_registry(lua_State *L);
-static int               obj_count(lua_State *L);
 static void*             obj_new(lua_State* L, size_t size, const char* tname);
-static int               obj_newindex(lua_State *L);
-static int               obj_index(lua_State *L);
-
-static int               push_objs(lua_State* L, void** objs);
 
 /**
  * Watcher functions:
  */
-static int                add_watcher_mt(lua_State *L);
-static int                watcher_is_active(lua_State *L);
-static int                watcher_is_pending(lua_State *L);
-static int                watcher_clear_pending(lua_State *L);
-static void*              watcher_new(lua_State* L, size_t size, const char* lua_type);
-static int                watcher_callback(lua_State *L);
-static int                watcher_priority(lua_State *L);
-static void               watcher_cb(struct ev_loop *loop, void *watcher, int revents);
-static struct ev_watcher* check_watcher(lua_State *L, int watcher_i);
+static int               add_watcher_mt(lua_State *L);
+static int               watcher_is_active(lua_State *L);
+static int               watcher_is_pending(lua_State *L);
+static int               watcher_clear_pending(lua_State *L);
+static ev_watcher*       watcher_new(lua_State* L, size_t size, const char* lua_type);
+static int               watcher_callback(lua_State *L);
+static int               watcher_priority(lua_State *L);
+static int               watcher_newindex(lua_State *L);
+static int               watcher_index(lua_State *L);
+static void              watcher_cb(struct ev_loop *loop, void *watcher, int revents);
+static ev_watcher*       check_watcher(lua_State *L, int watcher_i);
 
 /**
  * Timer functions:

@@ -27,7 +27,6 @@ static char lua_ev_stat_mt[]   = "ev{stat}";
 
 static const luaL_reg R[] = {
     {"version", version},
-    {"object_count", obj_count},
     {NULL, NULL},
 };
 
@@ -63,8 +62,6 @@ LUALIB_API int luaopen_ev(lua_State *L) {
 
     assert(ev_version_major() == EV_VERSION_MAJOR &&
            ev_version_minor() >= EV_VERSION_MINOR);
-
-    create_obj_registry(L);
 
     save_traceback(L);
 

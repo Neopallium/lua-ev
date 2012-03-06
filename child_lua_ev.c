@@ -59,7 +59,7 @@ static int child_new(lua_State* L) {
     int         trace = luaL_checkbool(L, 3);
     ev_child*   child;
 
-    child = watcher_new(L, sizeof(ev_child), CHILD_MT);
+    child = (ev_child*)watcher_new(L, sizeof(ev_child), CHILD_MT);
     ev_child_init(child, &child_cb, pid, trace);
     return 1;
 }
@@ -85,7 +85,7 @@ static int child_stop(lua_State *L) {
     ev_child*       child  = check_child(L, 1);
     struct ev_loop* loop = *check_loop_and_init(L, 2);
 
-    loop_stop_watcher(L, 2, 1);
+    loop_stop_watcher(L, loop, GET_WATCHER_DATA(child), 1);
     ev_child_stop(loop, child);
 
     return 0;
@@ -105,7 +105,7 @@ static int child_start(lua_State *L) {
     int is_daemon        = lua_toboolean(L, 3);
 
     ev_child_start(loop, child);
-    loop_start_watcher(L, 2, 1, is_daemon);
+    loop_start_watcher(L, loop, GET_WATCHER_DATA(child), 2, 1, is_daemon);
 
     return 0;
 }

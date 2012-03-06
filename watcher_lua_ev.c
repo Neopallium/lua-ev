@@ -16,8 +16,8 @@ static int add_watcher_mt(lua_State *L) {
         { "clear_pending", watcher_clear_pending },
         { "callback",      watcher_callback },
         { "priority",      watcher_priority },
-        { "__index",       obj_index },
-        { "__newindex",    obj_newindex },
+        { "__index",       watcher_index },
+        { "__newindex",    watcher_newindex },
         { NULL, NULL }
     };
     luaL_register(L, NULL, fns);
@@ -30,6 +30,12 @@ static int add_watcher_mt(lua_State *L) {
     return 0;
 }
 
+static ev_watcher* lua_ev_checkwatcher(lua_State *L, int idx, const char *type_mt) {
+    char *watcher = lua_ev_checkobject(L, idx, type_mt);
+    if (watcher != NULL) watcher += WATCHER_DATA_SIZE;
+    return (ev_watcher *)watcher;
+}
+
 /**
  * Checks that we have a watcher at watcher_i index by validating the
  * metatable has the <watcher_magic> field set to true that is simply
@@ -37,8 +43,8 @@ static int add_watcher_mt(lua_State *L) {
  *
  * [-0, +0, ?]
  */
-static struct ev_watcher* check_watcher(lua_State *L, int watcher_i) {
-    void *watcher = lua_touserdata(L, watcher_i);
+static ev_watcher* check_watcher(lua_State *L, int watcher_i) {
+    char *watcher = lua_touserdata(L, watcher_i);
     if ( watcher != NULL ) { /* Got a userdata? */
         if ( lua_getmetatable(L, watcher_i) ) { /* got a metatable? */
             lua_pushlightuserdata(L, (void*)watcher_magic);
@@ -46,7 +52,7 @@ static struct ev_watcher* check_watcher(lua_State *L, int watcher_i) {
 
             if ( lua_toboolean(L, -1) ) {
                 lua_pop(L, 2);
-                return (struct ev_watcher*)watcher;
+                return (ev_watcher*)(watcher + WATCHER_DATA_SIZE);
             }
         }
     }
@@ -101,21 +107,32 @@ static int watcher_clear_pending(lua_State *L) {
  *
  * [+1, -0, ?]
  */
-static void* watcher_new(lua_State* L, size_t size, const char* lua_type) {
-    void*  obj;
+static ev_watcher* watcher_new(lua_State* L, size_t size, const char* lua_type) {
+    char*  obj;
+    ev_watcher* watcher;
+    lua_ev_watcher_data *wdata;
 
     luaL_checktype(L, 1, LUA_TFUNCTION);
 
-    obj = obj_new(L, size, lua_type);
-    register_obj(L, -1, obj);
+    obj = obj_new(L, WATCHER_DATA_SIZE + size, lua_type);
 
-    lua_getfenv(L, -1);
-    lua_pushvalue(L, 1);
+    /* create fenv table for watcher. */
+    lua_createtable(L, 2, 0);
+
+    /* save reference to callback in fenv table. */
+    lua_pushvalue(L, 1); /* dup watcher callback function. */
     lua_rawseti(L, -2, WATCHER_FN);
 
-    lua_pop(L, 1);
+    /* set watcher's fenv table. */
+    lua_setfenv(L, -2);
 
-    return obj;
+    wdata = (lua_ev_watcher_data*)obj;
+    wdata->watcher_ref = LUA_NOREF;
+    wdata->flags = 0;
+
+    watcher = (ev_watcher*)(obj + WATCHER_DATA_SIZE);
+
+    return watcher;
 }
 
 /**
@@ -129,39 +146,33 @@ static void* watcher_new(lua_State* L, size_t size, const char* lua_type) {
  */
 static void watcher_cb(struct ev_loop *loop, void *watcher, int revents) {
     lua_State* L       = ev_userdata(loop);
-    void*      objs[3] = { loop, watcher, NULL };
+    lua_ev_watcher_data* wdata = GET_WATCHER_DATA(watcher);
     int        result;
-
-    push_traceback(L);
 
     result = lua_checkstack(L, 5);
     assert(result != 0 /* able to allocate enough space on lua stack */);
-    result = push_objs(L, objs);
-    assert(result == 2 /* pushed two objects on the lua stack */);
-    assert(!lua_isnil(L, -2) /* the loop obj was resolved */);
-    assert(!lua_isnil(L, -1) /* the watcher obj was resolved */);
 
-    /* STACK: <traceback>, <loop>, <watcher> */
+    /* push 'debug.traceback' function. */
+    push_traceback(L);
+
+    lua_rawgeti(L, LUA_REGISTRYINDEX, wdata->watcher_ref);
+    lua_getfenv(L, -1);
+    /* STACK: <traceback>, <watcher>, <watcher fenv> */
+    /* insert <callback>, <loop> before <watcher> */
+    lua_rawgeti(L, -1, WATCHER_FN);
+    lua_insert(L, -3);
+    lua_rawgeti(L, -1, WATCHER_LOOP);
+    lua_insert(L, -3);
+    lua_pop(L, 1); /* pop <watcher fenv> */
+
+    /* STACK: <traceback>, <watcher fn>, <loop>, <watcher> */
 
     if ( !ev_is_active(watcher) ) {
         /* Must remove "stop"ed watcher from loop: */
-        loop_stop_watcher(L, -2, -1);
+        loop_stop_watcher(L, loop, wdata, 1);
     }
 
-    lua_getfenv(L, -1);
-    assert(lua_istable(L, -1) /* The watcher fenv was found */);
-    lua_rawgeti(L, -1, WATCHER_FN);
-    if ( lua_isnil(L, -1) ) {
-        /* The watcher function was set to nil, so do nothing */
-        lua_pop(L, 5);
-        return;
-    }
-    assert(lua_isfunction(L, -1) /* watcher function is a function */);
-
-    /* STACK: <traceback>, <loop>, <watcher>, <watcher fenv>, <watcher fn> */
-
-    lua_insert(L, -4);
-    lua_pop(L, 1);
+    /* push revents */
     lua_pushinteger(L, revents);
 
     /* STACK: <traceback>, <watcher fn>, <loop>, <watcher>, <revents> */
@@ -169,9 +180,9 @@ static void watcher_cb(struct ev_loop *loop, void *watcher, int revents) {
         /* TODO: Enable user-specified error handler! */
         fprintf(stderr, "CALLBACK FAILED: %s\n",
                 lua_tostring(L, -1));
-        lua_pop(L, 2);
+        lua_pop(L, 2); /* pop error string & traceback function. */
     } else {
-        lua_pop(L, 1);
+        lua_pop(L, 1); /* pop traceback function. */
     }
 }
 
@@ -186,19 +197,19 @@ static void watcher_cb(struct ev_loop *loop, void *watcher, int revents) {
  * [+1, -0, e]
  */
 static int watcher_callback(lua_State *L) {
+    ev_watcher *watcher = check_watcher(L, 1);
+    lua_ev_watcher_data* wdata = GET_WATCHER_DATA(watcher);
     int has_fn = lua_gettop(L) > 1;
 
-    check_watcher(L, 1);
-    if ( has_fn ) luaL_checktype(L, 2, LUA_TFUNCTION);
-
     lua_getfenv(L, 1);
-    assert(lua_istable(L, -1) /* getfenv of watcher worked */);
-    lua_rawgeti(L, -1, WATCHER_FN);
+    lua_rawgeti(L, -1, WATCHER_FN); /* get current callback. */
+
     if ( has_fn ) {
+        luaL_checktype(L, 2, LUA_TFUNCTION);
         lua_pushvalue(L, 2);
-        lua_rawseti(L, -3, WATCHER_FN);
+        lua_rawseti(L, -3, WATCHER_FN); /* set new callback. */
     }
-    lua_remove(L, -2);
+    /* return current/old callback. */
     return 1;
 }
 
@@ -219,6 +230,83 @@ static int watcher_priority(lua_State *L) {
 
     if ( has_pri ) ev_set_priority(w, luaL_checkint(L, 2));
     lua_pushinteger(L, old_pri);
+    return 1;
+}
+
+/**
+ * Lazily create the shadow table, and provide write access to this
+ * shadow table.
+ *
+ * [-0, +0, ?]
+ */
+static int watcher_newindex(lua_State *L) {
+    ev_watcher *watcher = check_watcher(L, 1);
+    lua_ev_watcher_data* wdata = GET_WATCHER_DATA(watcher);
+
+    lua_settop(L, 3);
+    /* STACK: <watcher>, <key>, <value> */
+
+    if ( (wdata->flags & WATCHER_FLAG_HAS_SHADOW) ) {
+        /* get existing shadow table. */
+        lua_getfenv(L, 1);
+        lua_rawgeti(L, -1, WATCHER_SHADOW);
+        lua_remove(L, -2); /* remove fenv table. */
+    } else {
+        /* Lazily create the shadow table. */
+        lua_getfenv(L, 1);
+        lua_newtable(L);
+        lua_pushvalue(L, -1);
+        lua_rawseti(L, -3, WATCHER_SHADOW);
+        wdata->flags |= WATCHER_FLAG_HAS_SHADOW;
+    }
+    /* STACK: <watcher>, <key>, <value>, <shadow> */
+
+    /* h(table, key,value) */
+    lua_replace(L, 1); /* replace <watcher> userdata with shadow table. */
+    /* STACK: <shadow>, <key>, <value> */
+    lua_settable(L, 1);
+    return 0;
+}
+
+/**
+ * Provide read access to the shadow table.
+ *
+ * [-0, +1, ?]
+ */
+static int watcher_index(lua_State *L) {
+    ev_watcher *watcher;
+    lua_ev_watcher_data* wdata;
+
+    /* STACK: <watcher>, <key> */
+
+    /* first lookup method in metatable. */
+    if ( lua_getmetatable(L, 1) ) {
+        lua_pushvalue(L, 2);
+        /* STACK: <watcher>, <key>, <metatable>, <key> */
+        lua_gettable(L, -2);
+        /* STACK: <watcher>, <key>, <metatable>, <value> */
+        if ( ! lua_isnil(L, -1) ) return 1;
+        lua_pop(L, 2); /* pop <metatable>, <nil> */
+    }
+    /* STACK: <watcher>, <key> */
+
+    watcher = check_watcher(L, 1);
+    wdata = GET_WATCHER_DATA(watcher);
+
+    /* next check shadow table if the watcher has one. */
+    if ( (wdata->flags & WATCHER_FLAG_HAS_SHADOW) ) {
+        /* get shadow table from fenv. */
+        lua_getfenv(L, 1);
+        lua_rawgeti(L, -1, WATCHER_SHADOW);
+        lua_remove(L, -2); /* remove fenv table. */
+
+        lua_pushvalue(L, 2);
+        /* STACK: <watcher>, <key>, <shadow>, <key> */
+        lua_gettable(L, -2);
+        /* STACK: <watcher>, <key>, <shadow>, <value> */
+    } else {
+        lua_pushnil(L); /* no shadow table, just push nil. */
+    }
     return 1;
 }
 

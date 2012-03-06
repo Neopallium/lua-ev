@@ -56,7 +56,7 @@ static int timer_new(lua_State* L) {
     if ( repeat < 0.0 )
         luaL_argerror(L, 3, "repeat must be greater than or equal to 0");
 
-    timer = watcher_new(L, sizeof(ev_timer), TIMER_MT);
+    timer = (ev_timer*)watcher_new(L, sizeof(ev_timer), TIMER_MT);
     ev_timer_init(timer, &timer_cb, after, repeat);
     return 1;
 }
@@ -96,11 +96,11 @@ static int timer_again(lua_State *L) {
 
     if ( timer->repeat ) {
         ev_timer_again(loop, timer);
-        loop_start_watcher(L, 2, 1, -1);
+        loop_start_watcher(L, loop, GET_WATCHER_DATA(timer), 2, 1, -1);
     } else {
         /* Just calling stop instead of again in case the symantics
          * change in libev */
-        loop_stop_watcher(L, 2, 1);
+        loop_stop_watcher(L, loop, GET_WATCHER_DATA(timer), 1);
         ev_timer_stop(loop, timer);
     }
 
@@ -119,7 +119,7 @@ static int timer_stop(lua_State *L) {
     ev_timer*       timer  = check_timer(L, 1);
     struct ev_loop* loop   = *check_loop_and_init(L, 2);
 
-    loop_stop_watcher(L, 2, 1);
+    loop_stop_watcher(L, loop, GET_WATCHER_DATA(timer), 1);
     ev_timer_stop(loop, timer);
 
     return 0;
@@ -139,7 +139,7 @@ static int timer_start(lua_State *L) {
     int is_daemon          = lua_toboolean(L, 3);
 
     ev_timer_start(loop, timer);
-    loop_start_watcher(L, 2, 1, is_daemon);
+    loop_start_watcher(L, loop, GET_WATCHER_DATA(timer), 2, 1, is_daemon);
 
     return 0;
 }
@@ -161,7 +161,7 @@ static int timer_clear_pending(lua_State *L) {
     if ( ! timer->repeat           &&
          ( revents & EV_TIMEOUT ) )
     {
-        loop_stop_watcher(L, 2, 1);
+        loop_stop_watcher(L, loop, GET_WATCHER_DATA(timer), 1);
     }
 
     lua_pushnumber(L, revents);

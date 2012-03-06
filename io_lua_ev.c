@@ -50,7 +50,7 @@ static int io_new(lua_State* L) {
     int     events = luaL_checkint(L, 3);
     ev_io*  io;
 
-    io = watcher_new(L, sizeof(ev_io), IO_MT);
+    io = (ev_io*)watcher_new(L, sizeof(ev_io), IO_MT);
     ev_io_init(io, &io_cb, fd, events);
     return 1;
 }
@@ -76,7 +76,7 @@ static int io_stop(lua_State *L) {
     ev_io*          io     = check_io(L, 1);
     struct ev_loop* loop   = *check_loop_and_init(L, 2);
 
-    loop_stop_watcher(L, 2, 1);
+    loop_stop_watcher(L, loop, GET_WATCHER_DATA(io), 1);
     ev_io_stop(loop, io);
 
     return 0;
@@ -96,7 +96,7 @@ static int io_start(lua_State *L) {
     int is_daemon          = lua_toboolean(L, 3);
 
     ev_io_start(loop, io);
-    loop_start_watcher(L, 2, 1, is_daemon);
+    loop_start_watcher(L, loop, GET_WATCHER_DATA(io), 2, 1, is_daemon);
 
     return 0;
 }

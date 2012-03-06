@@ -78,7 +78,6 @@ static struct ev_loop** check_loop_and_init(lua_State *L, int loop_i) {
                        "libev init failed, perhaps LIBEV_FLAGS environment variable "
                        " is causing it to select a bad backend?");
         }
-        register_obj(L, loop_i, *loop_r);
     }
     return loop_r;
 }
@@ -97,8 +96,6 @@ static int loop_new(lua_State *L) {
         lua_tointeger(L, 1) : EVFLAG_AUTO;
 
     *loop_r = ev_loop_new(flags);
-
-    register_obj(L, -1, *loop_r);
 
     return 1;
 }
@@ -128,76 +125,76 @@ static int loop_delete(lua_State *L) {
  *
  * [-0, +0, m]
  */
-static void loop_start_watcher(lua_State* L, int loop_i, int watcher_i, int is_daemon) {
+static void loop_start_watcher(lua_State* L, struct ev_loop *loop, lua_ev_watcher_data* wdata, int loop_i, int watcher_i, int is_daemon) {
     int current_is_daemon = -1;
 
-    loop_i    = abs_index(L, loop_i);
-    watcher_i = abs_index(L, watcher_i);
+    /* get current is_daemon flag for watcher. */
+    current_is_daemon = ((wdata->flags & WATCHER_FLAG_IS_DAEMON) == WATCHER_FLAG_IS_DAEMON);
 
-    /* Check that watcher isn't already registered: */
-    lua_getfenv(L,     loop_i);
-    lua_pushvalue(L,   watcher_i);
-    lua_rawget(L,      -2);
-
-    if ( ! lua_isnil(L, -1) ) {
-        current_is_daemon = lua_toboolean(L, -1);
-    }
-    lua_pop(L, 1);
-
+    /* re-initialize watcher using the same is_daemon from the first initialization. */
     if ( is_daemon == -1 ) {
-        /* Set is_daemon properly for -1 case. */
-        if ( current_is_daemon == -1 )
-            is_daemon = 0;
-        else
-            is_daemon = current_is_daemon;
+        is_daemon = current_is_daemon;
     }
 
-    /* Currently not initialized, or daemon status change? */
-    if ( -1 == current_is_daemon ||
-         current_is_daemon ^ is_daemon )
-    {
-        lua_pushvalue(L,   watcher_i);
-        lua_pushboolean(L, is_daemon);
-        lua_rawset(L,      -3);
-        lua_pop(L,         1);
-
-        if ( ! is_daemon && -1 == current_is_daemon ) {
-            /* Do nothing, we are initializing a non-daemon */
-        } else if ( is_daemon ) {
+    /* check if watcher is stopped. */
+    if ( wdata->watcher_ref == LUA_NOREF ) {
+        /* initialize stopped watcher. */
+        lua_pushvalue(L, watcher_i);
+        wdata->watcher_ref = luaL_ref(L, LUA_REGISTRYINDEX);
+        lua_getfenv(L, watcher_i);
+        lua_pushvalue(L, loop_i);
+        lua_rawseti(L, -2, WATCHER_LOOP);
+        if ( is_daemon ) {
             /* unref() so that we are a "daemon" */
-            ev_unref(*check_loop_and_init(L, loop_i));
+            ev_unref(loop);
+            wdata->flags |= WATCHER_FLAG_IS_DAEMON;
+        } else {
+            wdata->flags &= ~WATCHER_FLAG_IS_DAEMON;
+        }
+        lua_pop(L, 1); /* pop fenv. */
+        return;
+    }
+
+    /* daemon status change? */
+    if ( current_is_daemon ^ is_daemon ) {
+        if ( is_daemon ) {
+            /* unref() so that we are a "daemon" */
+            ev_unref(loop);
+            wdata->flags |= WATCHER_FLAG_IS_DAEMON;
         } else {
             /* ref() so that we are no longer a "daemon" */
-            ev_ref(*check_loop_and_init(L, loop_i));
+            ev_ref(loop);
+            wdata->flags &= ~WATCHER_FLAG_IS_DAEMON;
         }
     }
 }
 
 /**
- * Must be called aftert stop()ing a watcher, or after a watcher is
+ * Must be called after stop()ing a watcher, or after a watcher is
  * automatically stopped (such as a non-repeating timer expiring).
  * This is necessary so that the watcher is not prematurely garbage
  * collected, and if the watcher is "marked as a daemon", then
  * ev_ref() is called in order to "undo" what was done in
- * loop_add_watcher().
+ * loop_start_watcher().
  *
  * [-0, +0, m]
  */
-static void loop_stop_watcher(lua_State* L, int loop_i, int watcher_i) {
-    loop_i    = abs_index(L, loop_i);
-    watcher_i = abs_index(L, watcher_i);
+static void loop_stop_watcher(lua_State* L, struct ev_loop *loop, lua_ev_watcher_data* wdata, int watcher_i) {
 
-    lua_getfenv(L,     loop_i);
-    lua_pushvalue(L,   watcher_i);
-    lua_rawget(L,      -2);
+    /* can only stop a started watcher. */
+    if ( wdata->watcher_ref == LUA_NOREF ) {
+        return;
+    }
+    luaL_unref(L, LUA_REGISTRYINDEX, wdata->watcher_ref);
+    wdata->watcher_ref = LUA_NOREF;
+    lua_getfenv(L, watcher_i);
 
-    if ( lua_toboolean(L, -1) ) ev_ref(*check_loop_and_init(L, loop_i));
-    lua_pop(L, 1);
-
-    lua_pushvalue(L,   watcher_i);
+    if ((wdata->flags & WATCHER_FLAG_IS_DAEMON)) {
+        ev_ref(loop);
+    }
     lua_pushnil(L);
-    lua_rawset(L,      -3);
-    lua_pop(L,         1);
+    lua_rawseti(L, -2, WATCHER_LOOP);
+    lua_pop(L, 1); /* pop fenv. */
 }
 
 /**

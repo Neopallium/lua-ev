@@ -45,7 +45,7 @@ static int create_idle_mt(lua_State *L) {
 static int idle_new(lua_State* L) {
     ev_idle*  idle;
 
-    idle = watcher_new(L, sizeof(ev_idle), IDLE_MT);
+    idle = (ev_idle*)watcher_new(L, sizeof(ev_idle), IDLE_MT);
     ev_idle_init(idle, &idle_cb);
     return 1;
 }
@@ -71,7 +71,7 @@ static int idle_stop(lua_State *L) {
     ev_idle*        idle   = check_idle(L, 1);
     struct ev_loop* loop   = *check_loop_and_init(L, 2);
 
-    loop_stop_watcher(L, 2, 1);
+    loop_stop_watcher(L, loop, GET_WATCHER_DATA(idle), 1);
     ev_idle_stop(loop, idle);
 
     return 0;
@@ -91,7 +91,7 @@ static int idle_start(lua_State *L) {
     int is_daemon          = lua_toboolean(L, 3);
 
     ev_idle_start(loop, idle);
-    loop_start_watcher(L, 2, 1, is_daemon);
+    loop_start_watcher(L, loop, GET_WATCHER_DATA(idle), 2, 1, is_daemon);
 
     return 0;
 }
