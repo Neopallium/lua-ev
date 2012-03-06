@@ -151,6 +151,7 @@ static int               watcher_clear_pending(lua_State *L);
 static ev_watcher*       watcher_new(lua_State* L, size_t size, const char* lua_type);
 static int               watcher_callback(lua_State *L);
 static int               watcher_priority(lua_State *L);
+static int               watcher_shadow(lua_State *L);
 static int               watcher_newindex(lua_State *L);
 static int               watcher_index(lua_State *L);
 static void              watcher_cb(struct ev_loop *loop, void *watcher, int revents);

@@ -16,6 +16,7 @@ static int add_watcher_mt(lua_State *L, luaL_reg* methods, const char* tname) {
         { "clear_pending", watcher_clear_pending },
         { "callback",      watcher_callback },
         { "priority",      watcher_priority },
+        { "shadow",        watcher_shadow },
         { NULL, NULL }
     };
     lua_ev_newmetatable(L, tname);
@@ -241,6 +242,39 @@ static int watcher_priority(lua_State *L) {
 
     if ( has_pri ) ev_set_priority(w, luaL_checkint(L, 2));
     lua_pushinteger(L, old_pri);
+    return 1;
+}
+
+/**
+ * Get/set the watcher shadow.  If passed a new_shadow, then the
+ * old_shadow will be returned.  Otherwise, just returns the current
+ * shadow function.
+ *
+ * Usage:
+ *   old_shadow = watcher:shadow([new_shadow])
+ *
+ * [+1, -0, e]
+ */
+static int watcher_shadow(lua_State *L) {
+    ev_watcher *watcher = check_watcher(L, 1);
+    lua_ev_watcher_data* wdata = GET_WATCHER_DATA(watcher);
+    int has_param = lua_gettop(L) > 1;
+
+    lua_getfenv(L, 1);
+    lua_rawgeti(L, -1, WATCHER_SHADOW); /* get current shadow. */
+
+    if ( has_param ) {
+        /* update has_shadow flag. */
+        if ( lua_isnil(L, 2) ) {
+            wdata->flags &= ~WATCHER_FLAG_HAS_SHADOW;
+        } else {
+            wdata->flags |= WATCHER_FLAG_HAS_SHADOW;
+        }
+        /* set new shadow. */
+        lua_pushvalue(L, 2);
+        lua_rawseti(L, -3, WATCHER_SHADOW); /* set new shadow. */
+    }
+    /* return current/old shadow. */
     return 1;
 }
 
