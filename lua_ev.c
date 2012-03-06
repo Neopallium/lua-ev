@@ -67,6 +67,27 @@ LUALIB_API int luaopen_ev(lua_State *L) {
 
     luaL_register(L, "ev", R);
 
+#define CONSTANT(def, name) do { \
+    lua_pushinteger(L, def); \
+    lua_setfield(L, -2, name); \
+} while(0);
+
+#if EV_VERSION_MAJOR >= 4
+    CONSTANT(EVRUN_NOWAIT, "NOWAIT");
+    CONSTANT(EVRUN_ONCE, "ONCE");
+    CONSTANT(EVBREAK_CANCEL, "CANCEL");
+    CONSTANT(EVBREAK_ONE, "ONE");
+    CONSTANT(EVBREAK_ALL, "ALL");
+#else
+    /* use names from 4.x */
+    CONSTANT(EVLOOP_NONBLOCK, "NOWAIT");
+    CONSTANT(EVLOOP_ONESHOT, "ONCE");
+    CONSTANT(EVUNLOOP_CANCEL, "CANCEL");
+    CONSTANT(EVUNLOOP_ONE, "ONE");
+    CONSTANT(EVUNLOOP_ALL, "ALL");
+#endif
+#undef CONSTANT
+
     luaopen_ev_loop(L);
     lua_setfield(L, -2, "Loop");
 
@@ -88,33 +109,22 @@ LUALIB_API int luaopen_ev(lua_State *L) {
     luaopen_ev_stat(L);
     lua_setfield(L, -2, "Stat");
 
-    lua_pushnumber(L, EV_READ);
-    lua_setfield(L, -2, "READ");
+#define CONSTANT(name) do { \
+    lua_pushinteger(L, EV_ ## name); \
+    lua_setfield(L, -2, #name); \
+} while(0);
 
-    lua_pushnumber(L, EV_WRITE);
-    lua_setfield(L, -2, "WRITE");
+    CONSTANT(READ);
+    CONSTANT(WRITE);
+    CONSTANT(TIMEOUT);
+    CONSTANT(SIGNAL);
+    CONSTANT(IDLE);
+    CONSTANT(CHILD);
+    CONSTANT(STAT);
+    CONSTANT(MINPRI);
+    CONSTANT(MAXPRI);
 
-    lua_pushnumber(L, EV_TIMEOUT);
-    lua_setfield(L, -2, "TIMEOUT");
-
-    lua_pushnumber(L, EV_SIGNAL);
-    lua_setfield(L, -2, "SIGNAL");
-
-    lua_pushnumber(L, EV_IDLE);
-    lua_setfield(L, -2, "IDLE");
-
-    lua_pushnumber(L, EV_CHILD);
-    lua_setfield(L, -2, "CHILD");
-
-    lua_pushnumber(L, EV_STAT);
-    lua_setfield(L, -2, "STAT");
-
-    lua_pushnumber(L, EV_MINPRI);
-    lua_setfield(L, -2, "MINPRI");
-
-    lua_pushnumber(L, EV_MAXPRI);
-    lua_setfield(L, -2, "MAXPRI");
-
+#undef CONSTANT
     return 1;
 }
 

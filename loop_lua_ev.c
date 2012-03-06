@@ -27,15 +27,18 @@ static int create_loop_mt(lua_State *L) {
 
     static luaL_reg methods[] = {
         { "is_default", loop_is_default },
-        { "count",      loop_iteration }, /* old API */
         { "iteration",  loop_iteration },
         { "depth",      loop_depth },
         { "now",        loop_now },
         { "update_now", loop_update_now },
-        { "loop",       loop_loop },
-        { "unloop",     loop_unloop },
+        { "run",        loop_run },
+        { "break",      loop_break },
         { "backend",    loop_backend },
         { "fork",       loop_fork },
+        /* older 3.x method names. */
+        { "count",      loop_iteration },
+        { "loop",       loop_run },
+        { "unloop",     loop_break },
         { NULL, NULL }
     };
     lua_ev_newmetatable(L, LOOP_MT);
@@ -261,20 +264,37 @@ static int loop_update_now(lua_State *L) {
 /**
  * Actually do the event loop.
  */
-static int loop_loop(lua_State *L) {
+static int loop_run(lua_State *L) {
     struct ev_loop *loop = *check_loop_and_init(L, 1);
     void *old_userdata = ev_userdata(loop);
+    int flags = luaL_optinteger(L, 2, 0);
+
     ev_set_userdata(loop, L);
-    ev_loop(loop, 0);
+#if EV_VERSION_MAJOR >= 4
+    ev_run(loop, flags);
+#else
+    ev_loop(loop, flags);
+#endif
     ev_set_userdata(loop, old_userdata);
     return 0;
 }
 
+#if EV_VERSION_MAJOR >= 4
+#define BREAK_DEFAULT EVBREAK_ALL
+#else
+#define BREAK_DEFAULT EVUNLOOP_ALL
+#endif
 /**
  * "Quit" out of the event loop.
  */
-static int loop_unloop(lua_State *L) {
-    ev_unloop(*check_loop_and_init(L, 1), EVUNLOOP_ALL);
+static int loop_break(lua_State *L) {
+    struct ev_loop *loop = *check_loop_and_init(L, 1);
+    int how = luaL_optinteger(L, 2, BREAK_DEFAULT);
+#if EV_VERSION_MAJOR >= 4
+    ev_break(loop, how);
+#else
+    ev_unloop(loop, how);
+#endif
     return 0;
 }
 
