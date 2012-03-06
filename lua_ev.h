@@ -72,6 +72,8 @@ struct lua_ev_watcher_data {
  * loop userdata is a pointer, so don't forget to de-reference the
  * result.
  */
+#define OBJ_TYPE_MAGIC_IDX 1
+#define WATCHER_TYPE_MAGIC_IDX (OBJ_TYPE_MAGIC_IDX+1)
 static void lua_ev_newmetatable(lua_State *L, const char *type_mt);
 static void lua_ev_getmetatable(lua_State *L, const char *type_mt);
 static void* lua_ev_checkobject(lua_State *L, int idx, const char *type_mt);

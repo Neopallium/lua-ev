@@ -22,8 +22,7 @@ static int add_watcher_mt(lua_State *L, luaL_reg* methods, const char* tname) {
 
     /* Mark this as being a watcher: */
     lua_pushlightuserdata(L, (void*)watcher_magic);
-    lua_pushboolean(L, 1);
-    lua_rawset(L, -3);
+    lua_rawseti(L, -2, WATCHER_TYPE_MAGIC_IDX);
 
     /* create methods table. */
     lua_createtable(L, 0, 10);
@@ -60,10 +59,9 @@ static ev_watcher* check_watcher(lua_State *L, int watcher_i) {
     char *watcher = lua_touserdata(L, watcher_i);
     if ( watcher != NULL ) { /* Got a userdata? */
         if ( lua_getmetatable(L, watcher_i) ) { /* got a metatable? */
-            lua_pushlightuserdata(L, (void*)watcher_magic);
-            lua_rawget(L, -2);
+            lua_rawgeti(L, -1, WATCHER_TYPE_MAGIC_IDX);
 
-            if ( lua_toboolean(L, -1) ) {
+            if ( lua_touserdata(L, -1) == watcher_magic ) {
                 lua_pop(L, 2);
                 return (ev_watcher*)(watcher + WATCHER_DATA_SIZE);
             }
